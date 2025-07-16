@@ -221,4 +221,4 @@ curl http://localhost:8000/health
 
 ## License
 
-MIT License 
+MIT License
