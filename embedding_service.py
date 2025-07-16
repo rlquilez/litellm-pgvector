@@ -54,13 +54,13 @@ class EmbeddingService:
             List of embedding vectors
         """
         try:
-            # Generate embeddings using OpenAI SDK pointing to LiteLLM proxy
-            kwargs = {
-                "model": self.config.model,
-                "input": texts
-            }
-            
-            response = await litellm.aembedding(**kwargs)
+            # Generate embeddings using LiteLLM
+            response = await litellm.aembedding(
+                model=self.config.model,
+                input=texts,
+                api_base=self.config.base_url,
+                api_key=self.config.api_key
+            )
             
             # Extract embeddings from response
             embeddings = [item.embedding for item in response.data]

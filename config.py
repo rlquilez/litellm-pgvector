@@ -27,7 +27,7 @@ class Settings(BaseSettings):
     database_url: str = "postgresql://username:password@localhost:5432/vectordb?schema=public"
     
     # API configuration
-    openai_api_key: str = "your-api-key-here"
+    server_api_key: str = "your-api-key-here"
     port: int = 8000
     host: str = "0.0.0.0"
     
