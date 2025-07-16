@@ -43,7 +43,7 @@ security = HTTPBearer()
 
 async def get_api_key(credentials: HTTPAuthorizationCredentials = Depends(security)):
     """Validate API key from Authorization header"""
-    expected_key = settings.openai_api_key
+    expected_key = settings.server_api_key
     if credentials.credentials != expected_key:
         raise HTTPException(status_code=401, detail="Invalid API key")
     return credentials.credentials
