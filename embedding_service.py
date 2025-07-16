@@ -1,5 +1,5 @@
 from typing import List, Optional
-from openai import AsyncOpenAI, NOT_GIVEN
+from openai import AsyncOpenAI
 from config import settings, EmbeddingConfig
 
 
@@ -29,11 +29,11 @@ class EmbeddingService:
         """
         try:
             # Generate embedding using OpenAI SDK pointing to LiteLLM proxy
-            response = await self.client.embeddings.create(
-                model=self.config.model,
-                input=[text],
-                dimensions=self.config.dimensions if "text-embedding-3" in self.config.model else NOT_GIVEN
-            )
+            kwargs = {
+                "model": self.config.model,
+                "input": [text]
+            }
+            response = await self.client.embeddings.create(**kwargs)
             
             # Extract embedding from response
             embedding = response.data[0].embedding
@@ -62,11 +62,12 @@ class EmbeddingService:
         """
         try:
             # Generate embeddings using OpenAI SDK pointing to LiteLLM proxy
-            response = await self.client.embeddings.create(
-                model=self.config.model,
-                input=texts,
-                dimensions=self.config.dimensions if "text-embedding-3" in self.config.model else NOT_GIVEN
-            )
+            kwargs = {
+                "model": self.config.model,
+                "input": texts
+            }
+            
+            response = await self.client.embeddings.create(**kwargs)
             
             # Extract embeddings from response
             embeddings = [item.embedding for item in response.data]
