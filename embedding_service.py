@@ -1,21 +1,14 @@
 from typing import List, Optional
-from openai import AsyncOpenAI
 from config import settings, EmbeddingConfig
-
+import litellm
 
 class EmbeddingService:
     """Service for generating embeddings using OpenAI SDK pointed at LiteLLM proxy"""
     
     def __init__(self, config: Optional[EmbeddingConfig] = None):
         self.config = config or settings.embedding
-        self.client = self._create_client()
-    
-    def _create_client(self) -> AsyncOpenAI:
-        """Create OpenAI client pointing to LiteLLM proxy"""
-        return AsyncOpenAI(
-            base_url=self.config.base_url,
-            api_key=self.config.api_key
-        )
+
+
     
     async def generate_embedding(self, text: str) -> List[float]:
         """
@@ -28,12 +21,12 @@ class EmbeddingService:
             List of floats representing the embedding vector
         """
         try:
-            # Generate embedding using OpenAI SDK pointing to LiteLLM proxy
-            kwargs = {
-                "model": self.config.model,
-                "input": [text]
-            }
-            response = await self.client.embeddings.create(**kwargs)
+            response = await litellm.aembedding(
+                model=self.config.model,
+                input=[text],
+                api_base=self.config.base_url,
+                api_key=self.config.api_key
+            )
             
             # Extract embedding from response
             embedding = response.data[0].embedding
@@ -67,7 +60,7 @@ class EmbeddingService:
                 "input": texts
             }
             
-            response = await self.client.embeddings.create(**kwargs)
+            response = await litellm.aembedding(**kwargs)
             
             # Extract embeddings from response
             embeddings = [item.embedding for item in response.data]
@@ -88,7 +81,6 @@ class EmbeddingService:
     def update_config(self, new_config: EmbeddingConfig):
         """Update the embedding configuration"""
         self.config = new_config
-        self.client = self._create_client()
 
 
 # Global embedding service instance
