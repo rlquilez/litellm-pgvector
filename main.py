@@ -153,31 +153,35 @@ async def search_vector_store(
         fields = settings.db_fields
         table_name = settings.table_names["embeddings"]
         
+        # Build query with proper parameter placeholders for Prisma
+        param_count = 1
+        query_params = [query_vector_str, vector_store_id]
+        
         base_query = f"""
         SELECT 
             {fields.id_field},
             {fields.content_field},
             {fields.metadata_field},
-            ({fields.embedding_field} <=> %s::vector) as distance
+            ({fields.embedding_field} <=> ${param_count}::vector) as distance
         FROM {table_name} 
-        WHERE {fields.vector_store_id_field} = %s
+        WHERE {fields.vector_store_id_field} = ${param_count + 1}
         """
+        param_count += 2
         
         # Add metadata filters if provided
         filter_conditions = []
-        query_params = [query_vector_str, vector_store_id]
         
         if request.filters:
             for key, value in request.filters.items():
-                filter_conditions.append(f"{fields.metadata_field}->>%s = %s")
+                filter_conditions.append(f"{fields.metadata_field}->>${param_count} = ${param_count + 1}")
                 query_params.extend([key, str(value)])
+                param_count += 2
         
         if filter_conditions:
             base_query += " AND " + " AND ".join(filter_conditions)
         
         # Add ordering and limit
-        final_query = base_query + f" ORDER BY distance ASC LIMIT %s"
-        query_params.append(str(limit))
+        final_query = base_query + f" ORDER BY distance ASC LIMIT {limit}"
         
         # Execute the query
         results = await db.query_raw(final_query, *query_params)
@@ -205,6 +209,8 @@ async def search_vector_store(
     except HTTPException:
         raise
     except Exception as e:
+        import traceback
+        traceback.print_exc()
         raise HTTPException(status_code=500, detail=f"Search failed: {str(e)}")
 
 

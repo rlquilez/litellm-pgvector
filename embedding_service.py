@@ -1,6 +1,8 @@
 from typing import List, Optional
 from config import settings, EmbeddingConfig
+from litellm.types.utils import EmbeddingResponse
 import litellm
+import logging
 
 class EmbeddingService:
     """Service for generating embeddings using OpenAI SDK pointed at LiteLLM proxy"""
@@ -21,15 +23,16 @@ class EmbeddingService:
             List of floats representing the embedding vector
         """
         try:
-            response = await litellm.aembedding(
+            response: EmbeddingResponse = await litellm.aembedding(
                 model=self.config.model,
                 input=[text],
                 api_base=self.config.base_url,
                 api_key=self.config.api_key
             )
+            logging.debug(f"Embedding response: {response}")
             
             # Extract embedding from response
-            embedding = response.data[0].embedding
+            embedding = response.data[0]["embedding"]
             
             # Validate embedding dimensions
             if len(embedding) != self.config.dimensions:
