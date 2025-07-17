@@ -213,6 +213,20 @@ Any embedding model supported by LiteLLM proxy can be used. Examples:
 }
 ```
 
+## Example Search Request
+
+```bash
+curl -X POST \
+  http://localhost:8000/v1/vector_stores/vs_support_faq/search \
+  -H "Authorization: Bearer sk-1234" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "query": "How do I return an item?",
+    "limit": 5,
+    "return_metadata": true
+  }'
+```
+
 ## Health Check
 
 ```bash
