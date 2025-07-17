@@ -42,4 +42,29 @@ class SearchResult(BaseModel):
 class VectorStoreSearchResponse(BaseModel):
     object: str = "vector_store.search"
     data: List[SearchResult]
-    usage: Dict[str, int] 
+    usage: Dict[str, int]
+
+
+class EmbeddingCreateRequest(BaseModel):
+    content: str
+    embedding: List[float]
+    metadata: Optional[Dict[str, Any]] = None
+
+
+class EmbeddingResponse(BaseModel):
+    id: str
+    object: str = "embedding"
+    vector_store_id: str
+    content: str
+    metadata: Optional[Dict[str, Any]] = None
+    created_at: int
+
+
+class EmbeddingBatchCreateRequest(BaseModel):
+    embeddings: List[EmbeddingCreateRequest]
+
+
+class EmbeddingBatchCreateResponse(BaseModel):
+    object: str = "embedding.batch"
+    data: List[EmbeddingResponse]
+    created: int 

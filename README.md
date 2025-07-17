@@ -24,7 +24,46 @@ curl -X POST \
   }'
 ```
 
-### 2. Search Vector Store
+### 2. Add Single Embedding to Vector Store
+```bash
+curl -X POST \
+  http://localhost:8000/v1/vector_stores/vs_abc123/embeddings \
+  -H "Authorization: Bearer your-api-key" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "content": "Our return policy allows returns within 30 days of purchase.",
+    "embedding": [0.1, 0.2, 0.3, ...],
+    "metadata": {
+      "category": "returns",
+      "source": "faq",
+      "id": "return_policy_1"
+    }
+  }'
+```
+
+### 3. Add Multiple Embeddings (Batch)
+```bash
+curl -X POST \
+  http://localhost:8000/v1/vector_stores/vs_abc123/embeddings/batch \
+  -H "Authorization: Bearer your-api-key" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "embeddings": [
+      {
+        "content": "Our return policy allows returns within 30 days of purchase.",
+        "embedding": [0.1, 0.2, 0.3, ...],
+        "metadata": {"category": "returns"}
+      },
+      {
+        "content": "Shipping is free for orders over $50.",
+        "embedding": [0.4, 0.5, 0.6, ...],
+        "metadata": {"category": "shipping"}
+      }
+    ]
+  }'
+```
+
+### 4. Search Vector Store
 ```bash
 curl -X POST \
   http://localhost:8000/v1/vector_stores/vs_abc123/search \
@@ -231,6 +270,82 @@ curl -X POST \
 
 ```bash
 curl http://localhost:8000/health
+```
+
+## Migrating Existing Data
+
+If you have an existing database with embeddings and content, you can easily migrate using the embedding APIs:
+
+### 1. Create Vector Store
+First, create a vector store for your data:
+
+```bash
+curl -X POST \
+  http://localhost:8000/v1/vector_stores \
+  -H "Authorization: Bearer your-api-key" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "name": "Migrated Data",
+    "metadata": {"source": "legacy_system"}
+  }'
+```
+
+### 2. Batch Insert Embeddings
+Use the batch endpoint to efficiently insert multiple embeddings:
+
+```bash
+curl -X POST \
+  http://localhost:8000/v1/vector_stores/vs_your_id/embeddings/batch \
+  -H "Authorization: Bearer your-api-key" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "embeddings": [
+      {
+        "content": "Your text content here",
+        "embedding": [0.1, 0.2, 0.3, ...1536 dimensions...],
+        "metadata": {"source_id": "doc_123", "category": "support"}
+      }
+    ]
+  }'
+```
+
+### 3. Migration Script Example
+
+Here's a Python script example for migrating from an existing database:
+
+```python
+import psycopg2
+import requests
+import json
+
+# Connect to your existing database
+conn = psycopg2.connect("your_existing_db_url")
+cur = conn.cursor()
+
+# Fetch existing data
+cur.execute("SELECT content, embedding, metadata FROM your_table")
+rows = cur.fetchall()
+
+# Prepare batch data
+embeddings = []
+for content, embedding, metadata in rows:
+    embeddings.append({
+        "content": content,
+        "embedding": embedding.tolist(),  # Convert numpy array to list
+        "metadata": metadata or {}
+    })
+
+# Send batch to API
+response = requests.post(
+    "http://localhost:8000/v1/vector_stores/your_vector_store_id/embeddings/batch",
+    headers={
+        "Authorization": "Bearer your-api-key",
+        "Content-Type": "application/json"
+    },
+    json={"embeddings": embeddings}
+)
+
+print(f"Migrated {len(embeddings)} embeddings")
 ```
 
 ## License

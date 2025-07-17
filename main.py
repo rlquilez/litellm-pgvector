@@ -13,7 +13,11 @@ from models import (
     VectorStoreResponse,
     VectorStoreSearchRequest,
     VectorStoreSearchResponse,
-    SearchResult
+    SearchResult,
+    EmbeddingCreateRequest,
+    EmbeddingResponse,
+    EmbeddingBatchCreateRequest,
+    EmbeddingBatchCreateResponse
 )
 from config import settings
 from embedding_service import embedding_service
@@ -212,6 +216,198 @@ async def search_vector_store(
         import traceback
         traceback.print_exc()
         raise HTTPException(status_code=500, detail=f"Search failed: {str(e)}")
+
+
+@app.post("/v1/vector_stores/{vector_store_id}/embeddings", response_model=EmbeddingResponse)
+async def create_embedding(
+    vector_store_id: str,
+    request: EmbeddingCreateRequest,
+    api_key: str = Depends(get_api_key)
+):
+    """
+    Add a single embedding to a vector store.
+    """
+    try:
+        # Check if vector store exists
+        vector_store_table = settings.table_names["vector_stores"]
+        vector_store_result = await db.query_raw(
+            f"SELECT id FROM {vector_store_table} WHERE id = $1",
+            vector_store_id
+        )
+        if not vector_store_result:
+            raise HTTPException(status_code=404, detail="Vector store not found")
+        
+        # Convert embedding to vector string format
+        embedding_vector_str = "[" + ",".join(map(str, request.embedding)) + "]"
+        
+        # Insert embedding using configurable field names
+        fields = settings.db_fields
+        table_name = settings.table_names["embeddings"]
+        
+        result = await db.query_raw(
+            f"""
+            INSERT INTO {table_name} ({fields.id_field}, {fields.vector_store_id_field}, {fields.content_field}, 
+                                     {fields.embedding_field}, {fields.metadata_field}, {fields.created_at_field})
+            VALUES (gen_random_uuid(), $1, $2, $3::vector, $4, NOW())
+            RETURNING {fields.id_field}, {fields.vector_store_id_field}, {fields.content_field}, 
+                     {fields.metadata_field}, EXTRACT(EPOCH FROM {fields.created_at_field})::bigint as created_at_timestamp
+            """,
+            vector_store_id,
+            request.content,
+            embedding_vector_str,
+            request.metadata or {}
+        )
+        
+        if not result:
+            raise HTTPException(status_code=500, detail="Failed to create embedding")
+            
+        embedding = result[0]
+        
+        # Update vector store statistics
+        await db.query_raw(
+            f"""
+            UPDATE {vector_store_table} 
+            SET file_counts = jsonb_set(
+                    COALESCE(file_counts, '{{"in_progress": 0, "completed": 0, "failed": 0, "cancelled": 0, "total": 0}}'::jsonb),
+                    '{{completed}}',
+                    (COALESCE(file_counts->>'completed', '0')::int + 1)::text::jsonb
+                ),
+                file_counts = jsonb_set(
+                    file_counts,
+                    '{{total}}',
+                    (COALESCE(file_counts->>'total', '0')::int + 1)::text::jsonb
+                ),
+                usage_bytes = COALESCE(usage_bytes, 0) + LENGTH($2),
+                last_active_at = NOW()
+            WHERE id = $1
+            """,
+            vector_store_id,
+            request.content
+        )
+        
+        return EmbeddingResponse(
+            id=embedding[fields.id_field],
+            vector_store_id=embedding[fields.vector_store_id_field],
+            content=embedding[fields.content_field],
+            metadata=embedding[fields.metadata_field],
+            created_at=int(embedding["created_at_timestamp"])
+        )
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=f"Failed to create embedding: {str(e)}")
+
+
+@app.post("/v1/vector_stores/{vector_store_id}/embeddings/batch", response_model=EmbeddingBatchCreateResponse)
+async def create_embeddings_batch(
+    vector_store_id: str,
+    request: EmbeddingBatchCreateRequest,
+    api_key: str = Depends(get_api_key)
+):
+    """
+    Add multiple embeddings to a vector store in batch.
+    """
+    try:
+        # Check if vector store exists
+        vector_store_table = settings.table_names["vector_stores"]
+        vector_store_result = await db.query_raw(
+            f"SELECT id FROM {vector_store_table} WHERE id = $1",
+            vector_store_id
+        )
+        if not vector_store_result:
+            raise HTTPException(status_code=404, detail="Vector store not found")
+        
+        if not request.embeddings:
+            raise HTTPException(status_code=400, detail="No embeddings provided")
+        
+        # Prepare batch insert
+        fields = settings.db_fields
+        table_name = settings.table_names["embeddings"]
+        
+        # Build VALUES clause for batch insert
+        values_clauses = []
+        params = []
+        param_count = 1
+        
+        for embedding_req in request.embeddings:
+            embedding_vector_str = "[" + ",".join(map(str, embedding_req.embedding)) + "]"
+            values_clauses.append(f"(gen_random_uuid(), ${param_count}, ${param_count + 1}, ${param_count + 2}::vector, ${param_count + 3}, NOW())")
+            params.extend([
+                vector_store_id,
+                embedding_req.content,
+                embedding_vector_str,
+                embedding_req.metadata or {}
+            ])
+            param_count += 4
+        
+        values_clause = ", ".join(values_clauses)
+        
+        # Execute batch insert
+        result = await db.query_raw(
+            f"""
+            INSERT INTO {table_name} ({fields.id_field}, {fields.vector_store_id_field}, {fields.content_field}, 
+                                     {fields.embedding_field}, {fields.metadata_field}, {fields.created_at_field})
+            VALUES {values_clause}
+            RETURNING {fields.id_field}, {fields.vector_store_id_field}, {fields.content_field}, 
+                     {fields.metadata_field}, EXTRACT(EPOCH FROM {fields.created_at_field})::bigint as created_at_timestamp
+            """,
+            *params
+        )
+        
+        if not result:
+            raise HTTPException(status_code=500, detail="Failed to create embeddings")
+        
+        # Calculate total content length for usage bytes update
+        total_content_length = sum(len(emb.content) for emb in request.embeddings)
+        
+        # Update vector store statistics
+        await db.query_raw(
+            f"""
+            UPDATE {vector_store_table} 
+            SET file_counts = jsonb_set(
+                    COALESCE(file_counts, '{{"in_progress": 0, "completed": 0, "failed": 0, "cancelled": 0, "total": 0}}'::jsonb),
+                    '{{completed}}',
+                    (COALESCE(file_counts->>'completed', '0')::int + $2)::text::jsonb
+                ),
+                file_counts = jsonb_set(
+                    file_counts,
+                    '{{total}}',
+                    (COALESCE(file_counts->>'total', '0')::int + $2)::text::jsonb
+                ),
+                usage_bytes = COALESCE(usage_bytes, 0) + $3,
+                last_active_at = NOW()
+            WHERE id = $1
+            """,
+            vector_store_id,
+            len(request.embeddings),
+            total_content_length
+        )
+        
+        # Convert results to response format
+        embeddings = []
+        for row in result:
+            embeddings.append(EmbeddingResponse(
+                id=row[fields.id_field],
+                vector_store_id=row[fields.vector_store_id_field],
+                content=row[fields.content_field],
+                metadata=row[fields.metadata_field],
+                created_at=int(row["created_at_timestamp"])
+            ))
+        
+        return EmbeddingBatchCreateResponse(
+            data=embeddings,
+            created=int(time.time())
+        )
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=f"Failed to create embeddings batch: {str(e)}")
 
 
 @app.get("/health")
