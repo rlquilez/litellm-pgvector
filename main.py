@@ -18,7 +18,8 @@ from models import (
     EmbeddingResponse,
     EmbeddingBatchCreateRequest,
     EmbeddingBatchCreateResponse,
-    VectorStoreListResponse
+    VectorStoreListResponse,
+    ContentChunk
 )
 from config import settings
 from embedding_service import embedding_service
@@ -288,17 +289,26 @@ async def search_vector_store(
             # Cosine distance ranges from 0 (identical) to 2 (opposite)
             similarity_score = max(0, 1 - (row['distance'] / 2))
             
+            # Extract filename from metadata or use a default
+            metadata = row[fields.metadata_field] or {}
+            filename = metadata.get('filename', 'document.txt')
+            
+            content_chunks = [ContentChunk(type="text", text=row[fields.content_field])]
+            
             result = SearchResult(
-                id=row[fields.id_field],
-                content=row[fields.content_field],
+                file_id=row[fields.id_field],
+                filename=filename,
                 score=similarity_score,
-                metadata=row[fields.metadata_field] if request.return_metadata else None
+                attributes=metadata if request.return_metadata else None,
+                content=content_chunks
             )
             search_results.append(result)
         
         return VectorStoreSearchResponse(
+            search_query=request.query,
             data=search_results,
-            usage={"total_tokens": len(search_results)}
+            has_more=False,  # TODO: Implement pagination
+            next_page=None
         )
         
     except HTTPException:

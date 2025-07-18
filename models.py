@@ -32,17 +32,25 @@ class VectorStoreSearchRequest(BaseModel):
     return_metadata: Optional[bool] = True
 
 
+class ContentChunk(BaseModel):
+    type: str = "text"
+    text: str
+
+
 class SearchResult(BaseModel):
-    id: str
-    content: str
+    file_id: str
+    filename: str
     score: float
-    metadata: Optional[Dict[str, Any]] = None
+    attributes: Optional[Dict[str, Any]] = None
+    content: List[ContentChunk]
 
 
 class VectorStoreSearchResponse(BaseModel):
-    object: str = "vector_store.search"
+    object: str = "vector_store.search_results.page"
+    search_query: str
     data: List[SearchResult]
-    usage: Dict[str, int]
+    has_more: bool = False
+    next_page: Optional[str] = None
 
 
 class EmbeddingCreateRequest(BaseModel):
