@@ -217,6 +217,7 @@ async def list_vector_stores(
 
 
 @app.post("/v1/vector_stores/{vector_store_id}/search", response_model=VectorStoreSearchResponse)
+@app.post("/vector_stores/{vector_store_id}/search", response_model=VectorStoreSearchResponse)
 async def search_vector_store(
     vector_store_id: str,
     request: VectorStoreSearchRequest,
