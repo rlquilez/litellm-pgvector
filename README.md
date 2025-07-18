@@ -24,7 +24,20 @@ curl -X POST \
   }'
 ```
 
-### 2. Add Single Embedding to Vector Store
+### 2. List Vector Stores
+```bash
+# List all vector stores
+curl -X GET \
+  http://localhost:8000/v1/vector_stores \
+  -H "Authorization: Bearer your-api-key"
+
+# List with pagination (limit and after parameters)
+curl -X GET \
+  "http://localhost:8000/v1/vector_stores?limit=10&after=vs_abc123" \
+  -H "Authorization: Bearer your-api-key"
+```
+
+### 3. Add Single Embedding to Vector Store
 ```bash
 curl -X POST \
   http://localhost:8000/v1/vector_stores/vs_abc123/embeddings \
@@ -41,7 +54,7 @@ curl -X POST \
   }'
 ```
 
-### 3. Add Multiple Embeddings (Batch)
+### 4. Add Multiple Embeddings (Batch)
 ```bash
 curl -X POST \
   http://localhost:8000/v1/vector_stores/vs_abc123/embeddings/batch \
@@ -63,7 +76,7 @@ curl -X POST \
   }'
 ```
 
-### 4. Search Vector Store
+### 5. Search Vector Store
 ```bash
 curl -X POST \
   http://localhost:8000/v1/vector_stores/vs_abc123/search \
@@ -231,6 +244,28 @@ Any embedding model supported by LiteLLM proxy can be used. Examples:
   },
   "status": "completed",
   "metadata": {}
+}
+```
+
+### Vector Store List Response
+```json
+{
+  "object": "list",
+  "data": [
+    {
+      "id": "vs_abc123",
+      "object": "vector_store",
+      "created_at": 1699024800,
+      "name": "Support FAQ",
+      "usage_bytes": 1024,
+      "file_counts": {"completed": 5, "total": 5},
+      "status": "completed",
+      "metadata": {}
+    }
+  ],
+  "first_id": "vs_abc123",
+  "last_id": "vs_def456",
+  "has_more": false
 }
 ```
 

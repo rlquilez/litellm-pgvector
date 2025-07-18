@@ -17,7 +17,8 @@ from models import (
     EmbeddingCreateRequest,
     EmbeddingResponse,
     EmbeddingBatchCreateRequest,
-    EmbeddingBatchCreateResponse
+    EmbeddingBatchCreateResponse,
+    VectorStoreListResponse
 )
 from config import settings
 from embedding_service import embedding_service
@@ -124,6 +125,95 @@ async def create_vector_store(
         
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to create vector store: {str(e)}")
+
+
+@app.get("/v1/vector_stores", response_model=VectorStoreListResponse)
+async def list_vector_stores(
+    limit: Optional[int] = 20,
+    after: Optional[str] = None,
+    before: Optional[str] = None,
+    api_key: str = Depends(get_api_key)
+):
+    """
+    List vector stores with optional pagination.
+    """
+    try:
+        limit = min(limit or 20, 100)  # Cap at 100 results
+        
+        vector_store_table = settings.table_names["vector_stores"]
+        
+        # Build base query
+        base_query = f"""
+        SELECT id, name, file_counts, status, usage_bytes, expires_after, expires_at, last_active_at, metadata,
+               EXTRACT(EPOCH FROM created_at)::bigint as created_at_timestamp
+        FROM {vector_store_table}
+        """
+        
+        # Add pagination conditions
+        conditions = []
+        params = []
+        param_count = 1
+        
+        if after:
+            conditions.append(f"id > ${param_count}")
+            params.append(after)
+            param_count += 1
+            
+        if before:
+            conditions.append(f"id < ${param_count}")
+            params.append(before)
+            param_count += 1
+        
+        if conditions:
+            base_query += " WHERE " + " AND ".join(conditions)
+        
+        # Add ordering and limit
+        final_query = base_query + f" ORDER BY created_at DESC LIMIT {limit + 1}"
+        
+        # Execute query
+        results = await db.query_raw(final_query, *params)
+        
+        # Check if there are more results
+        has_more = len(results) > limit
+        if has_more:
+            results = results[:limit]  # Remove extra result
+        
+        # Convert to response format
+        vector_stores = []
+        for row in results:
+            created_at = int(row["created_at_timestamp"])
+            expires_at = int(row["expires_at"].timestamp()) if row.get("expires_at") else None
+            last_active_at = int(row["last_active_at"].timestamp()) if row.get("last_active_at") else None
+            
+            vector_store = VectorStoreResponse(
+                id=row["id"],
+                created_at=created_at,
+                name=row["name"],
+                usage_bytes=row["usage_bytes"] or 0,
+                file_counts=row["file_counts"] or {"in_progress": 0, "completed": 0, "failed": 0, "cancelled": 0, "total": 0},
+                status=row["status"],
+                expires_after=row["expires_after"],
+                expires_at=expires_at,
+                last_active_at=last_active_at,
+                metadata=row["metadata"]
+            )
+            vector_stores.append(vector_store)
+        
+        # Determine first_id and last_id
+        first_id = vector_stores[0].id if vector_stores else None
+        last_id = vector_stores[-1].id if vector_stores else None
+        
+        return VectorStoreListResponse(
+            data=vector_stores,
+            first_id=first_id,
+            last_id=last_id,
+            has_more=has_more
+        )
+        
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=f"Failed to list vector stores: {str(e)}")
 
 
 @app.post("/v1/vector_stores/{vector_store_id}/search", response_model=VectorStoreSearchResponse)

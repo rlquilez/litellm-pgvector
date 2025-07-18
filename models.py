@@ -67,4 +67,12 @@ class EmbeddingBatchCreateRequest(BaseModel):
 class EmbeddingBatchCreateResponse(BaseModel):
     object: str = "embedding.batch"
     data: List[EmbeddingResponse]
-    created: int 
+    created: int
+
+
+class VectorStoreListResponse(BaseModel):
+    object: str = "list"
+    data: List[VectorStoreResponse]
+    first_id: Optional[str] = None
+    last_id: Optional[str] = None
+    has_more: bool = False
