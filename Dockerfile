@@ -10,7 +10,7 @@ ENV DATABASE_URL="postgresql://user:password@localhost:5432/dummy_db"
 
 WORKDIR /app
 
-# Install build dependencies including Node.js for Prisma
+# Install build dependencies for Prisma and PostgreSQL
 RUN apk add --no-cache --virtual .build-deps \
     gcc \
     musl-dev \
@@ -18,18 +18,20 @@ RUN apk add --no-cache --virtual .build-deps \
     postgresql-dev \
     curl \
     bash \
-    nodejs \
-    npm
+    git
 
 # Copy only requirements for caching
 COPY requirements.txt .
 RUN pip install --user --no-cache-dir -r requirements.txt
 
-# Copy application code
-COPY . .
+# Copy Prisma schema first
+COPY prisma/ ./prisma/
 
-# Make build script executable and run Prisma generation
-RUN chmod +x build-prisma.sh && ./build-prisma.sh
+# Generate Prisma client
+RUN python -m prisma generate
+
+# Copy rest of application code
+COPY . .
 
 # Stage 2: Runtime
 FROM python:3.11-alpine AS runtime
