@@ -47,7 +47,7 @@ jobs:
         uses: docker/setup-buildx-action@v3
 
       - name: Construir e enviar imagem multi-arch (amd64, arm64)
-        uses: docker/build-push-action@v5
+        uses: docker/build-push-action@v6
         timeout-minutes: 60
         continue-on-error: true
         id: docker_build
@@ -74,7 +74,7 @@ jobs:
           DOCKER_UPLOAD_TIMEOUT: 300
       - name: Retry Docker Build (se falhou)
         if: steps.docker_build.outcome == 'failure'
-        uses: docker/build-push-action@v5
+        uses: docker/build-push-action@v6
         timeout-minutes: 60
         with:
           context: .
