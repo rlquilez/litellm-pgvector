@@ -51,3 +51,9 @@ jobs:
           labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
+          # Otimizações para reduzir tamanho e melhorar upload
+          build-args: |
+            BUILDKIT_INLINE_CACHE=1
+          # Configurações para upload em registries com limitações
+          provenance: false
+          sbom: false
