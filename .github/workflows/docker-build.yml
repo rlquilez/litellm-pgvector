@@ -65,7 +65,6 @@ jobs:
           # Configurações para upload em registries com limitações (Cloudflare Free)
           provenance: false
           sbom: false
-          compress: true
         env:
           # Configurações específicas para Cloudflare Free
           DOCKER_UPLOAD_CHUNK_SIZE: 1048576
@@ -89,7 +88,6 @@ jobs:
             BUILDKIT_INLINE_CACHE=1
           provenance: false
           sbom: false
-          compress: true
         env:
           # Configurações ainda mais conservadoras para retry
           DOCKER_UPLOAD_CHUNK_SIZE: 524288
