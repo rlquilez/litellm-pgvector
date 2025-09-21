@@ -65,6 +65,7 @@ jobs:
           # Configurações para upload em registries com limitações (Cloudflare Free)
           provenance: false
           sbom: false
+          compress: true
         env:
           # Configurações específicas para Cloudflare Free
           DOCKER_UPLOAD_CHUNK_SIZE: 1048576
@@ -72,26 +73,3 @@ jobs:
           # Timeout mais longo para requests instáveis
           DOCKER_CLIENT_TIMEOUT: 300
           DOCKER_UPLOAD_TIMEOUT: 300
-
-      - name: Retry Docker Build (se falhou)
-        if: steps.docker_build.outcome == 'failure'
-        uses: docker/build-push-action@v5
-        timeout-minutes: 60
-        with:
-          context: .
-          push: true
-          platforms: linux/amd64,linux/arm64
-          tags: ${{ steps.meta.outputs.tags }}
-          labels: ${{ steps.meta.outputs.labels }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
-          build-args: |
-            BUILDKIT_INLINE_CACHE=1
-          provenance: false
-          sbom: false
-        env:
-          # Configurações ainda mais conservadoras para retry
-          DOCKER_UPLOAD_CHUNK_SIZE: 524288
-          DOCKER_UPLOAD_MAX_CONCURRENT_UPLOADS: 1
-          DOCKER_CLIENT_TIMEOUT: 600
-          DOCKER_UPLOAD_TIMEOUT: 600
