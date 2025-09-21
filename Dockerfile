@@ -15,9 +15,7 @@ RUN apk add --no-cache --virtual .build-deps \
     libffi-dev \
     postgresql-dev \
     curl \
-    bash \
-    nodejs \
-    npm
+    bash
 
 # Copy only requirements for caching
 COPY requirements.txt .
@@ -26,20 +24,38 @@ RUN pip install --user --no-cache-dir -r requirements.txt
 # Copy application code
 COPY . .
 
-# Generate Prisma client
-RUN npx prisma generate
+# Generate Prisma client (Python version)
+RUN python -m prisma generate
 
 # Stage 2: Runtime
 FROM python:3.11-alpine AS runtime
 
 WORKDIR /app
 
+# Install runtime dependencies only
+RUN apk add --no-cache \
+    postgresql-client \
+    libpq
+
 # Copy only installed dependencies
 COPY --from=builder /root/.local /root/.local
-ENV PATH=/root/.local/bin:$PATH
 
 # Copy application files
 COPY --from=builder /app .
+
+# Create non-root user for security
+RUN addgroup -g 1001 -S appgroup && \
+    adduser -S appuser -G appgroup -u 1001
+
+# Change ownership of app directory and user's local packages
+RUN chown -R appuser:appgroup /app && \
+    chown -R appuser:appgroup /root/.local
+
+# Switch to non-root user
+USER appuser
+
+# Set PATH for the non-root user
+ENV PATH=/root/.local/bin:$PATH
 
 # Expose port
 EXPOSE 8000
