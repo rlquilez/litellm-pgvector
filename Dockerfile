@@ -4,6 +4,7 @@ FROM python:3.11-slim as builder
 # Set environment variables
 ENV PYTHONDONTWRITEBYTECODE=1
 ENV PYTHONUNBUFFERED=1
+ENV DATABASE_URL="postgresql://placeholder:placeholder@localhost:5432/placeholder"
 
 # Install build dependencies
 RUN apt-get update && apt-get install -y \
@@ -18,9 +19,9 @@ WORKDIR /app
 COPY requirements.txt .
 RUN pip install --no-cache-dir --user -r requirements.txt
 
-# Generate Prisma client (se necessário)
+# Copy prisma schema and generate client
 COPY prisma ./prisma
-RUN ~/.local/bin/prisma generate
+RUN /root/.local/bin/prisma generate
 
 # Production stage
 FROM python:3.11-slim
