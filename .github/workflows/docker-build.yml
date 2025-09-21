@@ -11,6 +11,7 @@ jobs:
     runs-on: ubuntu-latest
     env:
       RUNNER_TOOL_CACHE: /toolcache
+      DOCKER_UPLOAD_MAX_CHUNK_SIZE: 4194304
     
     steps:
       - name: Checkout do código
