@@ -14,7 +14,7 @@ if [ ! -d "/app/prisma/generated" ]; then
     python -m prisma generate
     
     # Ajustar permissões dos arquivos gerados
-    chown -R appuser:appgroup /app/prisma/generated 2>/dev/null || true
+    chown -R appuser:appgroup /app/prisma/ 2>/dev/null || true
     
     echo "✅ Cliente Prisma gerado com sucesso!"
 else
@@ -24,4 +24,4 @@ fi
 echo "🚀 Iniciando aplicação como usuário não-root..."
 
 # Mudar para usuário não-root e executar o comando
-exec gosu appuser "$@"
+exec su-exec appuser "$@"

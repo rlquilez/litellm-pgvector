@@ -29,20 +29,28 @@ RUN pip install --user --no-cache-dir -r requirements.txt
 # Copy Prisma schema and application code
 COPY . .
 
-# Don't generate Prisma client during build - will be done at runtime
+# Clean up build dependencies to reduce layer size
+RUN apt-get purge -y \
+    gcc \
+    git \
+    curl \
+    && apt-get autoremove -y \
+    && apt-get clean \
+    && rm -rf /var/lib/apt/lists/* \
+    && rm -rf /tmp/* \
+    && rm -rf /var/tmp/*
 
-# Stage 2: Runtime
-FROM python:3.11-slim AS runtime
+# Stage 2: Runtime (Alpine para menor tamanho)
+FROM python:3.11-alpine AS runtime
 
 WORKDIR /app
 
-# Install runtime dependencies only
-RUN apt-get update && apt-get install -y \
-    libpq5 \
+# Install runtime dependencies only (minimal Alpine)
+RUN apk add --no-cache \
+    libpq \
     nodejs \
-    npm \
-    gosu \
-    && rm -rf /var/lib/apt/lists/*
+    su-exec \
+    bash
 
 # Copy only installed dependencies and generated Prisma client
 COPY --from=builder /root/.local /root/.local
