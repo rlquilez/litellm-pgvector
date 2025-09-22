@@ -26,15 +26,10 @@ RUN apt-get update && apt-get install -y \
 COPY requirements.txt .
 RUN pip install --user --no-cache-dir -r requirements.txt
 
-# Copy Prisma schema first
-COPY prisma/ ./prisma/
-
-# Install Prisma CLI and generate client
-RUN python -m prisma py fetch && \
-    python -m prisma generate
-
-# Copy rest of application code
+# Copy Prisma schema and application code
 COPY . .
+
+# Don't generate Prisma client during build - will be done at runtime
 
 # Stage 2: Runtime
 FROM python:3.11-slim AS runtime
@@ -44,6 +39,9 @@ WORKDIR /app
 # Install runtime dependencies only
 RUN apt-get update && apt-get install -y \
     libpq5 \
+    nodejs \
+    npm \
+    gosu \
     && rm -rf /var/lib/apt/lists/*
 
 # Copy only installed dependencies and generated Prisma client
@@ -52,16 +50,16 @@ COPY --from=builder /root/.local /root/.local
 # Copy application files (including generated Prisma client)
 COPY --from=builder /app .
 
+# Make entrypoint script executable
+RUN chmod +x docker-entrypoint.sh
+
 # Create non-root user for security
-RUN addgroup -g 1001 -S appgroup && \
-    adduser -S appuser -G appgroup -u 1001
+RUN addgroup --gid 1001 --system appgroup && \
+    adduser --system --uid 1001 --gid 1001 appuser
 
 # Change ownership of app directory and user's local packages
 RUN chown -R appuser:appgroup /app && \
     chown -R appuser:appgroup /root/.local
-
-# Switch to non-root user
-USER appuser
 
 # Set PATH for the non-root user
 ENV PATH=/root/.local/bin:$PATH
@@ -69,5 +67,6 @@ ENV PATH=/root/.local/bin:$PATH
 # Expose port
 EXPOSE 8000
 
-# Command to run the application
+# Set entrypoint and command (run as root to generate Prisma, then switch user)
+ENTRYPOINT ["./docker-entrypoint.sh"]
 CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]
