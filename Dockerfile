@@ -61,9 +61,9 @@ COPY --from=builder /app .
 # Make entrypoint script executable
 RUN chmod +x docker-entrypoint.sh
 
-# Create non-root user for security
-RUN addgroup --gid 1001 --system appgroup && \
-    adduser --system --uid 1001 --gid 1001 appuser
+# Create non-root user for security (Alpine syntax)
+RUN addgroup -g 1001 -S appgroup && \
+    adduser -S -u 1001 -G appgroup appuser
 
 # Change ownership of app directory and user's local packages
 RUN chown -R appuser:appgroup /app && \
