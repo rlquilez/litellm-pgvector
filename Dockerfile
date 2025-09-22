@@ -1,5 +1,5 @@
 # Stage 1: Builder
-FROM python:3.11-alpine AS builder
+FROM python:3.11-slim AS builder
 
 # Set environment variables
 ENV PYTHONDONTWRITEBYTECODE=1
@@ -11,14 +11,16 @@ ENV DATABASE_URL="postgresql://user:password@localhost:5432/dummy_db"
 WORKDIR /app
 
 # Install build dependencies for Prisma and PostgreSQL
-RUN apk add --no-cache --virtual .build-deps \
+RUN apt-get update && apt-get install -y \
     gcc \
-    musl-dev \
-    libffi-dev \
-    postgresql-dev \
+    libpq-dev \
     curl \
-    bash \
-    git
+    git \
+    openssl \
+    ca-certificates \
+    nodejs \
+    npm \
+    && rm -rf /var/lib/apt/lists/*
 
 # Copy only requirements for caching
 COPY requirements.txt .
@@ -27,21 +29,22 @@ RUN pip install --user --no-cache-dir -r requirements.txt
 # Copy Prisma schema first
 COPY prisma/ ./prisma/
 
-# Generate Prisma client
-RUN python -m prisma generate
+# Install Prisma CLI and generate client
+RUN python -m prisma py fetch && \
+    python -m prisma generate
 
 # Copy rest of application code
 COPY . .
 
 # Stage 2: Runtime
-FROM python:3.11-alpine AS runtime
+FROM python:3.11-slim AS runtime
 
 WORKDIR /app
 
 # Install runtime dependencies only
-RUN apk add --no-cache \
-    postgresql-client \
-    libpq
+RUN apt-get update && apt-get install -y \
+    libpq5 \
+    && rm -rf /var/lib/apt/lists/*
 
 # Copy only installed dependencies and generated Prisma client
 COPY --from=builder /root/.local /root/.local
