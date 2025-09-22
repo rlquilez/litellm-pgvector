@@ -383,10 +383,6 @@ response = requests.post(
 print(f"Migrated {len(embeddings)} embeddings")
 ```
 
-## Credits
-
-Special thanks to **Gustavo Dechechi** for his contributions to this project.
-
 ## License
 
 MIT License
